@@ -234,6 +234,8 @@ let audioContext = null;
 let spokenTimer = null;
 let connectionStatusTimer = null;
 let lastCadenceBand = null;
+let lastAnnouncedMinute = null;
+let cadenceSpeechBlockedUntil = 0;
 let lastDataTime = null;
 let lastRawDistanceM = null;
 let latest = { speedKph: 0, cadenceRpm: 0, powerW: 0, heartRate: 0 };
@@ -492,6 +494,8 @@ async function startWorkout() {
   workoutMetrics = freshWorkoutMetrics();
   workoutMetrics.lastMetricTime = performance.now() / 1000;
   lastCadenceBand = null;
+  lastAnnouncedMinute = null;
+  cadenceSpeechBlockedUntil = 0;
   selectedDurationSeconds = selectedMinutes() * 60;
   workoutStartPerformance = performance.now();
   workoutActive = true;
@@ -511,7 +515,17 @@ function updateWorkoutTimer() {
   const remaining = selectedDurationSeconds - elapsed;
   $("workout-clock").textContent = durationText(remaining);
   $("workout-clock").setAttribute("aria-label", `${Math.max(0, Math.ceil(remaining))} seconds remaining`);
-  if (remaining <= 0) finishWorkout(true, "Workout completed.");
+  if (remaining <= 0) {
+    finishWorkout(true, "Workout completed.");
+    return;
+  }
+  const minutesLeft = Math.ceil(remaining / 60);
+  const workoutMinutes = selectedDurationSeconds / 60;
+  if (minutesLeft >= 1 && minutesLeft < workoutMinutes && minutesLeft !== lastAnnouncedMinute) {
+    lastAnnouncedMinute = minutesLeft;
+    cadenceSpeechBlockedUntil = performance.now() + 3500;
+    speak(`${minutesLeft} minute${minutesLeft === 1 ? "" : "s"} left.`);
+  }
 }
 
 function resultFromMetrics(completed) {
@@ -630,6 +644,7 @@ function updateCadenceSpeech(cadenceRpm) {
   const band = Math.round(cadenceRpm / 5) * 5;
   if (band !== lastCadenceBand) {
     lastCadenceBand = band;
+    if (performance.now() < cadenceSpeechBlockedUntil) return;
     speak(String(band));
   }
 }

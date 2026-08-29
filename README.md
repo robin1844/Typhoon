@@ -11,6 +11,7 @@ The interface follows Cyclone's minimalist pattern: choose one of four large dur
 - Eligible starting tracks rotate through a persistent shuffled bag, avoiding an immediate repeat whenever possible.
 - A workout never wraps from 90 BPM back to 96 BPM.
 - Live cadence announcements contain the number only, matching Cyclone.
+- At each whole-minute boundary, the remaining workout time is announced and cadence speech briefly yields so the announcement is not interrupted.
 - Distance is not treated as a performance comparison or personal best. Typhoon reports distance for the completed workout, last 7 days, last 30 days and all time.
 - Performance comparisons are made only against completed workouts of the same selected duration.
 
