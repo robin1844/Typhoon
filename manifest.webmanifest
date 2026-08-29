@@ -1,0 +1,10 @@
+{
+  "name": "Typhoon",
+  "short_name": "Typhoon",
+  "description": "Accessible, measured short spin workouts with descending-tempo music.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#08111f",
+  "theme_color": "#08111f"
+}
