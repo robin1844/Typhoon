@@ -440,20 +440,45 @@ function ensureAudioContext() {
 
 function beep(frequency, durationSeconds, delaySeconds = 0) {
   ensureAudioContext();
-  const oscillator = audioContext.createOscillator();
+  const primary = audioContext.createOscillator();
+  const body = audioContext.createOscillator();
+  const bodyGain = audioContext.createGain();
   const master = audioContext.createGain();
   const start = audioContext.currentTime + delaySeconds;
   const end = start + durationSeconds;
-  oscillator.frequency.value = frequency;
-  oscillator.type = "square";
+  primary.frequency.value = frequency;
+  primary.type = "square";
+  body.frequency.value = frequency / 2;
+  body.type = "sine";
+  bodyGain.gain.value = 0.45;
   master.gain.setValueAtTime(0.0001, start);
-  master.gain.exponentialRampToValueAtTime(0.58, start + 0.015);
-  master.gain.setValueAtTime(0.58, Math.max(start + 0.02, end - 0.05));
+  master.gain.exponentialRampToValueAtTime(0.46, start + 0.018);
+  master.gain.setValueAtTime(0.46, Math.max(start + 0.02, end - 0.06));
   master.gain.exponentialRampToValueAtTime(0.0001, end);
-  oscillator.connect(master);
+  primary.connect(master);
+  body.connect(bodyGain).connect(master);
   master.connect(audioContext.destination);
-  oscillator.start(start);
-  oscillator.stop(end + 0.02);
+  for (const oscillator of [primary, body]) {
+    oscillator.start(start);
+    oscillator.stop(end + 0.02);
+  }
+}
+
+async function primeAudioOutput() {
+  ensureAudioContext();
+  if (audioContext.state === "suspended") {
+    try { await audioContext.resume(); } catch (error) {}
+  }
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const now = audioContext.currentTime;
+  oscillator.frequency.value = 220;
+  oscillator.type = "sine";
+  gain.gain.setValueAtTime(0.0008, now);
+  oscillator.connect(gain).connect(audioContext.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.7);
+  await wait(1000);
 }
 
 function finishSignal() {
@@ -467,7 +492,6 @@ async function runCountdown() {
   $("setup-section").hidden = true;
   $("results-section").hidden = true;
   $("countdown-section").hidden = false;
-  speak("Get ready.");
   for (const number of [3, 2, 1]) {
     $("countdown").textContent = String(number);
     beep(330, 0.32);
@@ -546,6 +570,7 @@ async function startWorkout() {
   await unlockMusic(playbackPlan[0]);
   setSetupEnabled(false);
   await acquireWakeLock();
+  await primeAudioOutput();
   await runCountdown();
 
   workoutMetrics = freshWorkoutMetrics();
