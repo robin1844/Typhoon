@@ -79,11 +79,6 @@
     min-height: clamp(7rem, 25vh, 10rem);
     font-size: 1.7rem;
   }
-  .duration-choice.selected {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-fg);
-  }
   #main-action {
     width: 100%;
     min-height: 30vh;
@@ -149,11 +144,11 @@
 <main>
   <section id="setup-section" aria-labelledby="setup-heading">
     <h2 id="setup-heading" class="vh">Choose workout length</h2>
-    <div class="duration-grid">
-      <button class="duration-choice" type="button" data-minutes="3" aria-pressed="false">3 minutes</button>
-      <button class="duration-choice" type="button" data-minutes="5" aria-pressed="false">5 minutes</button>
-      <button class="duration-choice" type="button" data-minutes="8" aria-pressed="false">8 minutes</button>
-      <button class="duration-choice" type="button" data-minutes="10" aria-pressed="false">10 minutes</button>
+    <div id="duration-grid" class="duration-grid">
+      <button class="duration-choice" type="button" data-minutes="3">3 minutes</button>
+      <button class="duration-choice" type="button" data-minutes="5">5 minutes</button>
+      <button class="duration-choice" type="button" data-minutes="8">8 minutes</button>
+      <button class="duration-choice" type="button" data-minutes="10">10 minutes</button>
     </div>
     <p id="connection-status" class="vh" role="status" aria-live="polite" aria-atomic="true"></p>
     <p id="unsupported" class="vh" hidden>This browser does not provide Web Bluetooth.</p>
@@ -311,19 +306,14 @@ function updateMainAction() {
   button.hidden = chosenMinutes === null;
   if (button.hidden) return;
   button.textContent = connected ? "Start" : "Connect";
-  button.setAttribute("aria-label", connected
-    ? `Start ${chosenMinutes} minute workout`
-    : `Connect for ${chosenMinutes} minute workout`);
+  button.removeAttribute("aria-label");
 }
 
 function chooseDuration(event) {
   chosenMinutes = Number(event.currentTarget.dataset.minutes);
-  for (const button of document.querySelectorAll(".duration-choice")) {
-    const selected = Number(button.dataset.minutes) === chosenMinutes;
-    button.classList.toggle("selected", selected);
-    button.setAttribute("aria-pressed", String(selected));
-  }
+  $("duration-grid").hidden = true;
   updateMainAction();
+  $("main-action").focus();
 }
 
 function shuffle(values) {
@@ -738,7 +728,7 @@ async function finishConnection(chosenDevice) {
   lastDataTime = null;
   lastRawDistanceM = null;
   lastCadenceBand = null;
-  setConnectionStatus(`Connected to ${device.name || "bike"}. Choose a workout length and start when ready.`);
+  setConnectionStatus(`Connected to ${device.name || "bike"}.${chosenMinutes === null ? " Choose a workout length." : " Start when ready."}`);
   setSetupEnabled(true);
   updateMainAction();
 }
@@ -843,10 +833,7 @@ function renderDistanceStats(currentWorkoutKm = 0) {
 
 function anotherWorkout() {
   chosenMinutes = null;
-  for (const button of document.querySelectorAll(".duration-choice")) {
-    button.classList.remove("selected");
-    button.setAttribute("aria-pressed", "false");
-  }
+  $("duration-grid").hidden = false;
   $("results-section").hidden = true;
   $("distance-section").hidden = true;
   $("post-workout-actions").hidden = true;

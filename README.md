@@ -2,7 +2,7 @@
 
 Typhoon is a compact, accessible Web Bluetooth spin-workout app for 3, 5, 8 and 10 minute efforts. It connects to an FTMS indoor bike, runs a race-style starting countdown, plays an automatically selected descending-tempo music sequence, stops precisely at the selected time and reports performance comparisons and personal bests.
 
-The interface follows Cyclone's minimalist pattern: choose one of four large duration buttons, use the single large button to connect and then start, and receive the results followed by distance totals at the finish.
+The interface follows Cyclone's minimalist pattern: choose one of four ordinary large duration buttons, which are then replaced by the single large Connect button. That same button becomes Start after connection. Results are followed by distance totals at the finish.
 
 ## Workout behaviour
 
