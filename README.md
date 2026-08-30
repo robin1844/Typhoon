@@ -10,8 +10,10 @@ The interface follows Cyclone's minimalist pattern: choose one of four ordinary 
 - Music always follows the order 96, 94, 93, 92 and 90 BPM.
 - Eligible starting tracks rotate through a persistent shuffled bag, avoiding an immediate repeat whenever possible.
 - A workout never wraps from 90 BPM back to 96 BPM.
-- Live cadence announcements contain the number only, matching Cyclone.
+- Live cadence announcements contain the number only, matching Cyclone, and occur only while a workout is running.
 - At each whole-minute boundary, the remaining workout time is announced and cadence speech briefly yields so the announcement is not interrupted.
+- Cadence and speed continue to be recorded in saved sessions, but are intentionally omitted from the current results screen.
+- The countdown and finish use layered, high-impact race signals.
 - Distance is not treated as a performance comparison or personal best. Typhoon reports distance for the completed workout, last 7 days, last 30 days and all time.
 - Performance comparisons are made only against completed workouts of the same selected duration.
 

@@ -142,26 +142,22 @@
 </header>
 
 <main>
-  <section id="setup-section" aria-labelledby="setup-heading">
-    <h2 id="setup-heading" class="vh">Choose workout length</h2>
+  <section id="setup-section">
     <div id="duration-grid" class="duration-grid">
       <button class="duration-choice" type="button" data-minutes="3">3 minutes</button>
       <button class="duration-choice" type="button" data-minutes="5">5 minutes</button>
       <button class="duration-choice" type="button" data-minutes="8">8 minutes</button>
       <button class="duration-choice" type="button" data-minutes="10">10 minutes</button>
     </div>
-    <p id="connection-status" class="vh" role="status" aria-live="polite" aria-atomic="true"></p>
     <p id="unsupported" class="vh" hidden>This browser does not provide Web Bluetooth.</p>
     <button id="main-action" type="button" hidden>Connect</button>
   </section>
 
-  <section id="countdown-section" aria-labelledby="countdown-heading" hidden>
-    <h2 id="countdown-heading" class="vh">Get ready</h2>
+  <section id="countdown-section" hidden>
     <div id="countdown" aria-hidden="true">3</div>
   </section>
 
-  <section id="workout-section" aria-labelledby="workout-heading" hidden>
-    <h2 id="workout-heading" class="vh">Workout in progress</h2>
+  <section id="workout-section" hidden>
     <div id="workout-clock" aria-label="Time remaining">0:00</div>
     <div id="cadence-display">
       <div id="cadence-label">Cadence (RPM)</div>
@@ -170,12 +166,12 @@
     <button id="end-early" type="button">End workout early</button>
   </section>
 
-  <section id="results-section" aria-labelledby="results-heading" hidden>
+  <section id="results-section" hidden>
     <h2 id="results-heading" tabindex="-1">Workout results</h2>
     <ul id="comparison-list" class="comparison-list"></ul>
   </section>
 
-  <section id="distance-section" aria-labelledby="distance-heading" hidden>
+  <section id="distance-section" hidden>
     <h2 id="distance-heading">Distance</h2>
     <div class="stat-row"><span class="stat-label">This workout</span><span class="stat-value" id="distance-workout">0.00 kilometres</span></div>
     <div class="stat-row"><span class="stat-label">Last 7 days</span><span class="stat-value" id="distance-week">0.00 kilometres</span></div>
@@ -214,10 +210,6 @@ const TRACKS = [
 const RESULT_METRICS = [
   { key: "averagePowerW", label: "Average power", unit: "Watts", decimals: 0 },
   { key: "topPowerW", label: "Top power", unit: "Watts", decimals: 0 },
-  { key: "averageCadenceRpm", label: "Average cadence", unit: "RPM", decimals: 0 },
-  { key: "topCadenceRpm", label: "Top cadence", unit: "RPM", decimals: 0 },
-  { key: "averageSpeedKph", label: "Average speed", unit: "KPH", decimals: 1 },
-  { key: "topSpeedKph", label: "Top speed", unit: "KPH", decimals: 1 },
   { key: "calories", label: "Calories", unit: "calories", decimals: 0 }
 ];
 
@@ -227,7 +219,6 @@ let connected = false;
 let wakeLock = null;
 let audioContext = null;
 let spokenTimer = null;
-let connectionStatusTimer = null;
 let lastCadenceBand = null;
 let lastAnnouncedMinute = null;
 let cadenceSpeechBlockedUntil = 0;
@@ -285,12 +276,7 @@ function speak(text) {
   });
 }
 
-function setConnectionStatus(text) {
-  const status = $("connection-status");
-  status.textContent = text;
-  clearTimeout(connectionStatusTimer);
-  connectionStatusTimer = setTimeout(() => { status.textContent = ""; }, 8000);
-}
+function setConnectionStatus(text) { console.info(text); }
 
 function selectedMinutes() {
   return chosenMinutes;
@@ -397,19 +383,35 @@ function ensureAudioContext() {
   if (audioContext.state === "suspended") audioContext.resume();
 }
 
-function beep(frequency, durationSeconds) {
+function beep(frequency, durationSeconds, delaySeconds = 0) {
   ensureAudioContext();
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  const now = audioContext.currentTime;
-  oscillator.frequency.value = frequency;
-  oscillator.type = "sine";
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.32, now + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + durationSeconds);
-  oscillator.connect(gain).connect(audioContext.destination);
-  oscillator.start(now);
-  oscillator.stop(now + durationSeconds + 0.02);
+  const primary = audioContext.createOscillator();
+  const body = audioContext.createOscillator();
+  const bodyGain = audioContext.createGain();
+  const master = audioContext.createGain();
+  const start = audioContext.currentTime + delaySeconds;
+  const end = start + durationSeconds;
+  primary.frequency.value = frequency;
+  primary.type = "square";
+  body.frequency.value = frequency / 2;
+  body.type = "sine";
+  bodyGain.gain.value = 0.45;
+  master.gain.setValueAtTime(0.0001, start);
+  master.gain.exponentialRampToValueAtTime(0.46, start + 0.018);
+  master.gain.setValueAtTime(0.46, Math.max(start + 0.02, end - 0.06));
+  master.gain.exponentialRampToValueAtTime(0.0001, end);
+  primary.connect(master);
+  body.connect(bodyGain).connect(master);
+  master.connect(audioContext.destination);
+  for (const oscillator of [primary, body]) {
+    oscillator.start(start);
+    oscillator.stop(end + 0.02);
+  }
+}
+
+function finishSignal() {
+  beep(330, 0.3);
+  beep(660, 0.65, 0.36);
 }
 
 function wait(milliseconds) { return new Promise(resolve => setTimeout(resolve, milliseconds)); }
@@ -421,11 +423,11 @@ async function runCountdown() {
   speak("Get ready.");
   for (const number of [3, 2, 1]) {
     $("countdown").textContent = String(number);
-    beep(660, 0.16);
+    beep(330, 0.32);
     await wait(900);
   }
   $("countdown").textContent = "Go";
-  beep(990, 0.42);
+  beep(660, 0.65);
   await wait(120);
 }
 
@@ -609,6 +611,10 @@ async function finishWorkout(completed, statusText) {
   $("music").pause();
   $("music-preload").pause();
   $("workout-section").hidden = true;
+  if (completed) {
+    finishSignal();
+    await wait(1100);
+  }
   await releaseWakeLock();
 
   const result = resultFromMetrics(completed);
@@ -631,6 +637,7 @@ function updateLiveDisplay() {
 }
 
 function updateCadenceSpeech(cadenceRpm) {
+  if (!workoutActive) return;
   const band = Math.round(cadenceRpm / 5) * 5;
   if (band !== lastCadenceBand) {
     lastCadenceBand = band;
