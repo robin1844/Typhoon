@@ -128,7 +128,7 @@
   .stat-value { color: var(--accent); font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums; }
   #post-workout-actions { display: grid; gap: .75rem; margin-top: 2rem; }
   #another-workout { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-  #reset-history { color: var(--muted); font-size: .9rem; }
+  #reset-history, #update-weight { color: var(--muted); font-size: .9rem; }
   audio { display: none; }
   [hidden] { display: none !important; }
   .vh {
@@ -196,6 +196,7 @@
   <div id="post-workout-actions" hidden>
     <button id="another-workout" type="button">Another workout</button>
     <button id="reset-history" type="button">Reset workout history</button>
+    <button id="update-weight" type="button">Update weight</button>
   </div>
 </div>
 
@@ -208,6 +209,8 @@ const SESSION_KEY = "typhoon-sessions-v1";
 const DEVICE_KEY = "typhoon-device-name";
 const LAST_START_KEY = "typhoon-last-start-track";
 const LAST_WORKOUT_TRACKS_KEY = "typhoon-last-workout-tracks";
+const WEIGHT_KEY = "typhoon-weight-kg";
+const DEFAULT_WEIGHT_KG = 75;
 const $ = id => document.getElementById(id);
 
 const TRACKS = [
@@ -221,6 +224,8 @@ const TRACKS = [
 const RESULT_METRICS = [
   { key: "averagePowerW", label: "Average power", unit: "Watts", decimals: 0 },
   { key: "topPowerW", label: "Top power", unit: "Watts", decimals: 0 },
+  { key: "averageWattsPerKg", label: "Average Watts per kilo", unit: "Watts per kilo", decimals: 2 },
+  { key: "maximumWattsPerKg", label: "Maximum Watts per kilo", unit: "Watts per kilo", decimals: 2 },
   { key: "calories", label: "Calories", unit: "calories", decimals: 0 }
 ];
 
@@ -247,6 +252,7 @@ let playbackIndex = 0;
 let heardTrackIds = [];
 let activeMusicElement = null;
 let standbyMusicElement = null;
+let currentWorkoutWeightKg = DEFAULT_WEIGHT_KG;
 let workoutMetrics = freshWorkoutMetrics();
 let chosenMinutes = null;
 
@@ -271,6 +277,10 @@ function safeGet(key, fallback = null) {
 }
 function safeSet(key, value) {
   try { localStorage.setItem(key, value); } catch (error) {}
+}
+function loadWeightKg() {
+  const weight = Number(safeGet(WEIGHT_KEY, String(DEFAULT_WEIGHT_KG)));
+  return Number.isFinite(weight) && weight >= 30 && weight <= 250 ? weight : DEFAULT_WEIGHT_KG;
 }
 function loadSessions() {
   try {
@@ -511,6 +521,7 @@ function onMusicEnded(event) {
 
 async function startWorkout() {
   if (!connected || workoutActive) return;
+  currentWorkoutWeightKg = loadWeightKg();
   selectedDurationSeconds = selectedMinutes() * 60;
   playbackPlan = createPlaybackPlan(selectedDurationSeconds);
   playbackIndex = 0;
@@ -605,6 +616,9 @@ function resultFromMetrics(completed) {
     distanceKm: workoutMetrics.distanceM / 1000,
     averagePowerW: workoutMetrics.powerWeighted / sampleSeconds,
     topPowerW: workoutMetrics.topPowerW,
+    weightKg: currentWorkoutWeightKg,
+    averageWattsPerKg: (workoutMetrics.powerWeighted / sampleSeconds) / currentWorkoutWeightKg,
+    maximumWattsPerKg: workoutMetrics.topPowerW / currentWorkoutWeightKg,
     averageCadenceRpm: workoutMetrics.cadenceWeighted / sampleSeconds,
     topCadenceRpm: workoutMetrics.topCadenceRpm,
     averageSpeedKph: workoutMetrics.speedWeighted / sampleSeconds,
@@ -625,16 +639,25 @@ function differenceText(metric, amount) {
   return `${number} ${metric.unit}`;
 }
 
+function metricNumber(metric, session) {
+  const stored = Number(session[metric.key]);
+  if (Number.isFinite(stored)) return stored;
+  const weight = Number(session.weightKg) > 0 ? Number(session.weightKg) : DEFAULT_WEIGHT_KG;
+  if (metric.key === "averageWattsPerKg") return (Number(session.averagePowerW) || 0) / weight;
+  if (metric.key === "maximumWattsPerKg") return (Number(session.topPowerW) || 0) / weight;
+  return 0;
+}
+
 function comparisonFor(metric, result, earlier) {
-  const value = Number(result[metric.key]) || 0;
+  const value = metricNumber(metric, result);
   if (!earlier.length) {
     return `${metric.label}: ${metricValueText(metric, value)}. First recorded result for this workout. Personal best for ${result.durationMinutes} minutes.`;
   }
 
-  const previous = Number(earlier[earlier.length - 1][metric.key]) || 0;
-  const average = earlier.reduce((sum, session) => sum + (Number(session[metric.key]) || 0), 0) / earlier.length;
-  const best = Math.max(...earlier.map(session => Number(session[metric.key]) || 0));
-  const tolerance = metric.decimals === 0 ? 0.5 : 0.05;
+  const previous = metricNumber(metric, earlier[earlier.length - 1]);
+  const average = earlier.reduce((sum, session) => sum + metricNumber(metric, session), 0) / earlier.length;
+  const best = Math.max(...earlier.map(session => metricNumber(metric, session)));
+  const tolerance = 0.5 * Math.pow(10, -metric.decimals);
   const versusPrevious = value - previous;
   const versusAverage = value - average;
   const clauses = [];
@@ -950,12 +973,25 @@ function resetHistory() {
   speak("All Typhoon workout history has been cleared.");
 }
 
+function updateWeight() {
+  const response = prompt("Enter your weight in kilograms.", String(loadWeightKg()));
+  if (response === null) return;
+  const weight = Number(response.trim().replace(",", "."));
+  if (!Number.isFinite(weight) || weight < 30 || weight > 250) {
+    alert("Enter a weight between 30 and 250 kilograms.");
+    return;
+  }
+  safeSet(WEIGHT_KEY, String(weight));
+  speak(`Weight updated to ${weight} kilograms. It will be used for future workouts.`);
+}
+
 function init() {
   for (const button of document.querySelectorAll(".duration-choice")) button.addEventListener("click", chooseDuration);
   $("main-action").addEventListener("click", () => connected ? startWorkout() : connect());
   $("end-early").addEventListener("click", () => finishWorkout(false, "Workout ended early. The incomplete result was not saved."));
   $("another-workout").addEventListener("click", anotherWorkout);
   $("reset-history").addEventListener("click", resetHistory);
+  $("update-weight").addEventListener("click", updateWeight);
   for (const element of [$("music"), $("music-preload")]) {
     element.addEventListener("ended", onMusicEnded);
     element.addEventListener("error", () => {

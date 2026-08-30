@@ -18,6 +18,7 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 - Spoken comparisons use commas rather than em dashes and do not repeat the workout duration.
 - Compare performance metrics only with completed sessions of the same duration.
 - Continue recording cadence and speed, but do not display them in results unless Robin asks to restore them.
+- Display average and maximum Watts per kilo after average and top power. Default weight is 75 kilograms; persist the chosen weight and the weight used by each session. Keep Update weight as the final results-screen control.
 - Never compare distance or treat it as a personal best. Report distance for this workout, last 7 days, last 30 days and all time.
 - Preserve the local `Songs/` folder, but do not commit it; it contains the large lossless sources.
 
