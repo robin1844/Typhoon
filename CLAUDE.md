@@ -11,6 +11,8 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 - Starting tracks rotate. Exclude every song actually heard in the immediately preceding workout; cycle within the remaining pool if needed, allowing a larger BPM wrap-around jump rather than violating that exclusion.
 - The workout and music stop automatically at the exact selected duration.
 - Cadence announcements use the number only and occur only during the workout.
+- Announce every whole-minute boundary after the start, plus 30, 20, 10, 5, 4, 3, 2 and 1 seconds. Time calls are visible and always take precedence over cadence speech.
+- Use the two alternating audio elements to preload and hand off between songs with minimal silence.
 - Keep exactly one hidden ARIA live element for spoken output; do not add named regions, status regions or page landmarks.
 - Spoken units: spell out Watts and kilometres; RPM and KPH are acceptable.
 - Spoken comparisons use commas rather than em dashes and do not repeat the workout duration.

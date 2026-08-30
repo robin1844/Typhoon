@@ -99,6 +99,15 @@
     margin: 2rem 0;
   }
   #countdown { color: var(--danger); }
+  #countdown-message {
+    min-height: 1.5em;
+    margin: -1rem 0 1.5rem;
+    text-align: center;
+    color: var(--danger);
+    font-size: 2rem;
+    font-weight: 850;
+    font-variant-numeric: tabular-nums;
+  }
   #cadence-display { text-align: center; margin: 2rem 0; }
   #cadence-label { color: var(--muted); font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
   #live-cadence-value { color: var(--accent); font-size: 6rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -163,6 +172,7 @@
 
   <section id="workout-section" hidden>
     <div id="workout-clock" aria-label="Time remaining">0:00</div>
+    <div id="countdown-message" aria-hidden="true" hidden></div>
     <div id="cadence-display">
       <div id="cadence-label">Cadence (RPM)</div>
       <div id="live-cadence-value">0</div>
@@ -221,8 +231,9 @@ let wakeLock = null;
 let audioContext = null;
 let spokenTimer = null;
 let lastCadenceBand = null;
-let lastAnnouncedMinute = null;
 let cadenceSpeechBlockedUntil = 0;
+let previousTimerRemaining = 0;
+let announcedTimeMilestones = new Set();
 let lastDataTime = null;
 let lastRawDistanceM = null;
 let latest = { speedKph: 0, cadenceRpm: 0, powerW: 0, heartRate: 0 };
@@ -234,6 +245,8 @@ let workoutTimer = null;
 let playbackPlan = [];
 let playbackIndex = 0;
 let heardTrackIds = [];
+let activeMusicElement = null;
+let standbyMusicElement = null;
 let workoutMetrics = freshWorkoutMetrics();
 let chosenMinutes = null;
 
@@ -440,31 +453,39 @@ async function runCountdown() {
 }
 
 async function unlockMusic(firstTrack) {
-  const music = $("music");
-  music.src = firstTrack.file;
-  music.load();
-  music.muted = true;
-  try {
-    await music.play();
-    music.pause();
-    music.currentTime = 0;
-  } catch (error) {}
-  music.muted = false;
+  activeMusicElement = $("music");
+  standbyMusicElement = $("music-preload");
+  const tracksToUnlock = [firstTrack, playbackPlan[1] || firstTrack];
+  for (let index = 0; index < 2; index++) {
+    const element = index === 0 ? activeMusicElement : standbyMusicElement;
+    element.pause();
+    element.src = tracksToUnlock[index].file;
+    element.load();
+    element.muted = true;
+    try {
+      await element.play();
+      element.pause();
+      element.currentTime = 0;
+    } catch (error) {}
+    element.muted = false;
+  }
 }
 
 function preloadFollowingTrack() {
   const next = playbackPlan[playbackIndex + 1];
-  const preloader = $("music-preload");
-  if (!next) { preloader.removeAttribute("src"); return; }
-  preloader.src = next.file;
-  preloader.load();
+  if (!standbyMusicElement) return;
+  if (!next) { standbyMusicElement.removeAttribute("src"); return; }
+  if (!standbyMusicElement.src.endsWith(next.file)) {
+    standbyMusicElement.src = next.file;
+    standbyMusicElement.load();
+  }
 }
 
 async function playCurrentTrack() {
   if (!workoutActive) return;
   const track = playbackPlan[playbackIndex];
   if (!track) return;
-  const music = $("music");
+  const music = activeMusicElement || $("music");
   if (!music.src.endsWith(track.file)) {
     music.src = track.file;
     music.load();
@@ -479,10 +500,13 @@ async function playCurrentTrack() {
   catch (error) { speak("Music could not start. The workout timer is still running."); }
 }
 
-function onMusicEnded() {
-  if (!workoutActive) return;
+function onMusicEnded(event) {
+  if (!workoutActive || event.currentTarget !== activeMusicElement) return;
   playbackIndex++;
-  if (playbackIndex < playbackPlan.length) playCurrentTrack();
+  if (playbackIndex < playbackPlan.length) {
+    [activeMusicElement, standbyMusicElement] = [standbyMusicElement, activeMusicElement];
+    playCurrentTrack();
+  }
 }
 
 async function startWorkout() {
@@ -500,14 +524,17 @@ async function startWorkout() {
   workoutMetrics = freshWorkoutMetrics();
   workoutMetrics.lastMetricTime = performance.now() / 1000;
   lastCadenceBand = null;
-  lastAnnouncedMinute = null;
   cadenceSpeechBlockedUntil = 0;
   selectedDurationSeconds = selectedMinutes() * 60;
+  previousTimerRemaining = selectedDurationSeconds;
+  announcedTimeMilestones = new Set();
   workoutStartPerformance = performance.now();
   workoutActive = true;
   $("countdown-section").hidden = true;
   $("workout-section").hidden = false;
   $("workout-clock").textContent = durationText(selectedDurationSeconds);
+  $("countdown-message").textContent = "";
+  $("countdown-message").hidden = true;
   updateLiveDisplay();
   await playCurrentTrack();
   setConnectionStatus("Workout running. Keep pedalling.");
@@ -525,13 +552,46 @@ function updateWorkoutTimer() {
     finishWorkout(true, "Workout completed.");
     return;
   }
-  const minutesLeft = Math.ceil(remaining / 60);
-  const workoutMinutes = selectedDurationSeconds / 60;
-  if (minutesLeft >= 1 && minutesLeft < workoutMinutes && minutesLeft !== lastAnnouncedMinute) {
-    lastAnnouncedMinute = minutesLeft;
-    cadenceSpeechBlockedUntil = performance.now() + 3500;
-    speak(`${minutesLeft} minute${minutesLeft === 1 ? "" : "s"} left.`);
+  const crossed = timeMilestones().filter(milestone =>
+    !announcedTimeMilestones.has(milestone.seconds) &&
+    previousTimerRemaining > milestone.seconds &&
+    remaining <= milestone.seconds
+  );
+  if (crossed.length) {
+    const milestone = crossed[crossed.length - 1];
+    announcedTimeMilestones.add(milestone.seconds);
+    announceTimeMilestone(milestone.text);
   }
+  previousTimerRemaining = remaining;
+}
+
+function timeMilestones() {
+  const milestones = [];
+  for (let minutes = selectedDurationSeconds / 60 - 1; minutes >= 1; minutes--) {
+    milestones.push({
+      seconds: minutes * 60,
+      text: `${minutes} minute${minutes === 1 ? "" : "s"} remaining.`
+    });
+  }
+  milestones.push(
+    { seconds: 30, text: "30 seconds left." },
+    { seconds: 20, text: "20 seconds." },
+    { seconds: 10, text: "10 seconds." },
+    { seconds: 5, text: "5" },
+    { seconds: 4, text: "4" },
+    { seconds: 3, text: "3" },
+    { seconds: 2, text: "2" },
+    { seconds: 1, text: "1" }
+  );
+  return milestones.sort((first, second) => second.seconds - first.seconds);
+}
+
+function announceTimeMilestone(text) {
+  const message = $("countdown-message");
+  message.textContent = text;
+  message.hidden = false;
+  cadenceSpeechBlockedUntil = performance.now() + 3500;
+  speak(text);
 }
 
 function resultFromMetrics(completed) {
@@ -654,10 +714,16 @@ function updateLiveDisplay() {
 
 function updateCadenceSpeech(cadenceRpm) {
   if (!workoutActive) return;
+  const now = performance.now();
+  const remaining = selectedDurationSeconds - (now - workoutStartPerformance) / 1000;
+  if (remaining <= 32.5 || now < cadenceSpeechBlockedUntil) return;
+  const approachingMinute = timeMilestones().some(milestone =>
+    milestone.seconds >= 60 && remaining > milestone.seconds && remaining <= milestone.seconds + 2.5
+  );
+  if (approachingMinute) return;
   const band = Math.round(cadenceRpm / 5) * 5;
   if (band !== lastCadenceBand) {
     lastCadenceBand = band;
-    if (performance.now() < cadenceSpeechBlockedUntil) return;
     speak(String(band));
   }
 }
@@ -890,10 +956,12 @@ function init() {
   $("end-early").addEventListener("click", () => finishWorkout(false, "Workout ended early. The incomplete result was not saved."));
   $("another-workout").addEventListener("click", anotherWorkout);
   $("reset-history").addEventListener("click", resetHistory);
-  $("music").addEventListener("ended", onMusicEnded);
-  $("music").addEventListener("error", () => {
-    if (workoutActive) speak("The next music track could not be loaded. The workout timer will continue.");
-  });
+  for (const element of [$("music"), $("music-preload")]) {
+    element.addEventListener("ended", onMusicEnded);
+    element.addEventListener("error", () => {
+      if (workoutActive) speak("The next music track could not be loaded. The workout timer will continue.");
+    });
+  }
   if (!navigator.bluetooth) $("unsupported").hidden = false;
   renderDistanceStats(0);
   updateMainAction();

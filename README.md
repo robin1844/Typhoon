@@ -11,9 +11,10 @@ The interface follows Cyclone's minimalist pattern: choose one of four ordinary 
 - Eligible starting tracks rotate through persistent shuffled bags.
 - Every track actually heard in the immediately preceding workout is excluded from the next one. If necessary, Typhoon cycles within the remaining pool so that exclusion is absolute even for consecutive 10-minute sessions.
 - Live cadence announcements contain the number only, matching Cyclone, and occur only while a workout is running.
-- At each whole-minute boundary, the remaining workout time is announced and cadence speech briefly yields so the announcement is not interrupted.
+- At every whole-minute boundary after the start, the remaining time is announced. The final countdown is 30 seconds, 20 seconds, 10 seconds, then 5, 4, 3, 2, 1. These calls appear on screen and take priority over cadence speech.
 - Cadence and speed continue to be recorded in saved sessions, but are intentionally omitted from the current results screen.
 - The countdown and finish use layered, high-impact race signals.
+- Two alternating, pre-unlocked audio players preload consecutive tracks to minimise silence at song changes.
 - Distance is not treated as a performance comparison or personal best. Typhoon reports distance for the completed workout, last 7 days, last 30 days and all time.
 - Performance comparisons are made only against completed workouts of the same selected duration.
 
