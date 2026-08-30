@@ -7,14 +7,15 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 - FTMS service `0x1826`, Indoor Bike Data characteristic `0x2ad2`.
 - Workout choices are 3, 5, 8 and 10 minutes.
 - Race-start beeps precede the authoritative workout timer.
-- Music uses only the five MP3 files in `audio/`, in descending order: 96, 94, 93, 92, 90 BPM.
-- Starting tracks rotate; tracks never wrap back to a higher BPM within a workout.
+- Music uses only the five MP3 files in `audio/`, preferring the descending order 96, 94, 93, 92, 90 BPM.
+- Starting tracks rotate. Exclude every song actually heard in the immediately preceding workout; cycle within the remaining pool if needed, allowing a larger BPM wrap-around jump rather than violating that exclusion.
 - The workout and music stop automatically at the exact selected duration.
-- Cadence announcements use the number only.
-- Use ARIA live regions, not `speechSynthesis`.
+- Cadence announcements use the number only and occur only during the workout.
+- Keep exactly one hidden ARIA live element for spoken output; do not add named regions, status regions or page landmarks.
 - Spoken units: spell out Watts and kilometres; RPM and KPH are acceptable.
 - Spoken comparisons use commas rather than em dashes and do not repeat the workout duration.
 - Compare performance metrics only with completed sessions of the same duration.
+- Continue recording cadence and speed, but do not display them in results unless Robin asks to restore them.
 - Never compare distance or treat it as a personal best. Report distance for this workout, last 7 days, last 30 days and all time.
 - Preserve the local `Songs/` folder, but do not commit it; it contains the large lossless sources.
 

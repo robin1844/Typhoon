@@ -7,9 +7,9 @@ The interface follows Cyclone's minimalist pattern: choose one of four ordinary 
 ## Workout behaviour
 
 - Workout lengths: 3, 5, 8 and 10 minutes.
-- Music always follows the order 96, 94, 93, 92 and 90 BPM.
-- Eligible starting tracks rotate through a persistent shuffled bag, avoiding an immediate repeat whenever possible.
-- A workout never wraps from 90 BPM back to 96 BPM.
+- Music follows the order 96, 94, 93, 92 and 90 BPM where possible, with a wrap-around jump only when needed to cover the workout.
+- Eligible starting tracks rotate through persistent shuffled bags.
+- Every track actually heard in the immediately preceding workout is excluded from the next one. If necessary, Typhoon cycles within the remaining pool so that exclusion is absolute even for consecutive 10-minute sessions.
 - Live cadence announcements contain the number only, matching Cyclone, and occur only while a workout is running.
 - At each whole-minute boundary, the remaining workout time is announced and cadence speech briefly yields so the announcement is not interrupted.
 - Cadence and speed continue to be recorded in saved sessions, but are intentionally omitted from the current results screen.

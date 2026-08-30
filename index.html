@@ -50,14 +50,14 @@
     font-size: 1.05rem;
     line-height: 1.65;
   }
-  header {
+  #page-header {
     padding: 1.4rem 1.5rem 1.2rem;
     background: var(--header);
     color: var(--header-fg);
     border-bottom: 3px solid var(--accent);
   }
   h1 { max-width: 32rem; margin: 0 auto; font-size: 2rem; font-weight: 800; letter-spacing: -.03em; }
-  main { max-width: 32rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  #page-main { max-width: 32rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
   h2 { margin: 0 0 1rem; font-size: 1.4rem; }
   button {
     min-height: 3.5rem;
@@ -137,11 +137,15 @@
 </style>
 </head>
 <body>
-<header>
-  <h1>Typhoon</h1>
-</header>
+<div id="spoken" class="vh" aria-live="assertive" aria-atomic="true"></div>
+<audio id="music" preload="auto"></audio>
+<audio id="music-preload" preload="auto"></audio>
 
-<main>
+<div id="page-header">
+  <h1>Typhoon</h1>
+</div>
+
+<div id="page-main">
   <section id="setup-section">
     <div id="duration-grid" class="duration-grid">
       <button class="duration-choice" type="button" data-minutes="3">3 minutes</button>
@@ -183,11 +187,7 @@
     <button id="another-workout" type="button">Another workout</button>
     <button id="reset-history" type="button">Reset workout history</button>
   </div>
-
-  <p id="spoken" class="vh" aria-live="assertive" aria-atomic="true"></p>
-  <audio id="music" preload="auto"></audio>
-  <audio id="music-preload" preload="auto"></audio>
-</main>
+</div>
 
 <script>
 "use strict";
@@ -197,6 +197,7 @@ const INDOOR_BIKE_DATA = 0x2ad2;
 const SESSION_KEY = "typhoon-sessions-v1";
 const DEVICE_KEY = "typhoon-device-name";
 const LAST_START_KEY = "typhoon-last-start-track";
+const LAST_WORKOUT_TRACKS_KEY = "typhoon-last-workout-tracks";
 const $ = id => document.getElementById(id);
 
 const TRACKS = [
@@ -232,6 +233,7 @@ let workoutStartPerformance = 0;
 let workoutTimer = null;
 let playbackPlan = [];
 let playbackIndex = 0;
+let heardTrackIds = [];
 let workoutMetrics = freshWorkoutMetrics();
 let chosenMinutes = null;
 
@@ -276,7 +278,7 @@ function speak(text) {
   });
 }
 
-function setConnectionStatus(text) { console.info(text); }
+function setConnectionStatus() {}
 
 function selectedMinutes() {
   return chosenMinutes;
@@ -314,26 +316,22 @@ function shuffle(values) {
   return result;
 }
 
-function eligibleStartIndices(workoutSeconds) {
-  const toleranceSeconds = 0.1;
-  let availableSeconds = 0;
-  const eligible = [];
-  for (let index = TRACKS.length - 1; index >= 0; index--) {
-    availableSeconds += TRACKS[index].seconds;
-    if (availableSeconds >= workoutSeconds - toleranceSeconds) eligible.unshift(index);
-  }
-  return eligible;
+function loadLastWorkoutTrackIds() {
+  try {
+    const ids = JSON.parse(safeGet(LAST_WORKOUT_TRACKS_KEY, "[]"));
+    return Array.isArray(ids) ? ids.map(Number).filter(Number.isFinite) : [];
+  } catch (error) { return []; }
 }
 
-function selectStartingIndex(workoutSeconds) {
+function selectStartingIndex(workoutSeconds, candidates) {
   const minutes = Math.round(workoutSeconds / 60);
-  const key = `typhoon-start-bag-${minutes}`;
-  const eligible = eligibleStartIndices(workoutSeconds);
+  const candidateIds = candidates.map(index => TRACKS[index].id).join("-");
+  const key = `typhoon-start-bag-v2-${minutes}-${candidateIds}`;
   let bag;
   try { bag = JSON.parse(safeGet(key, "[]")); } catch (error) { bag = []; }
   if (!Array.isArray(bag)) bag = [];
-  bag = bag.filter(index => eligible.includes(index));
-  if (!bag.length) bag = shuffle(eligible);
+  bag = bag.filter(index => candidates.includes(index));
+  if (!bag.length) bag = shuffle(candidates);
 
   const lastTrackId = Number(safeGet(LAST_START_KEY, "-1"));
   if (bag.length > 1 && TRACKS[bag[0]].id === lastTrackId) [bag[0], bag[1]] = [bag[1], bag[0]];
@@ -345,13 +343,23 @@ function selectStartingIndex(workoutSeconds) {
 }
 
 function createPlaybackPlan(workoutSeconds) {
-  const startingIndex = selectStartingIndex(workoutSeconds);
+  const previousTrackIds = new Set(loadLastWorkoutTrackIds());
+  let candidates = TRACKS.map((track, index) => ({ track, index }))
+    .filter(({ track }) => !previousTrackIds.has(track.id))
+    .map(({ index }) => index);
+  if (!candidates.length) candidates = TRACKS.map((track, index) => index);
+
+  const startingIndex = selectStartingIndex(workoutSeconds, candidates);
+  let candidatePosition = candidates.indexOf(startingIndex);
   const plan = [];
   let remaining = workoutSeconds;
-  for (let index = startingIndex; index < TRACKS.length && remaining > 0.1; index++) {
+  while (remaining > 0.1) {
+    const index = candidates[candidatePosition];
     const track = TRACKS[index];
-    plan.push({ ...track, playFor: Math.min(track.seconds, remaining) });
-    remaining -= track.seconds;
+    const playFor = Math.min(track.seconds, remaining);
+    plan.push({ ...track, playFor });
+    remaining -= playFor;
+    candidatePosition = (candidatePosition + 1) % candidates.length;
   }
   return plan;
 }
@@ -428,7 +436,7 @@ async function runCountdown() {
   }
   $("countdown").textContent = "Go";
   beep(660, 0.65);
-  await wait(120);
+  await wait(700);
 }
 
 async function unlockMusic(firstTrack) {
@@ -460,9 +468,14 @@ async function playCurrentTrack() {
   if (!music.src.endsWith(track.file)) {
     music.src = track.file;
     music.load();
+  } else if (music.ended) {
+    music.currentTime = 0;
   }
   preloadFollowingTrack();
-  try { await music.play(); }
+  try {
+    await music.play();
+    if (!heardTrackIds.includes(track.id)) heardTrackIds.push(track.id);
+  }
   catch (error) { speak("Music could not start. The workout timer is still running."); }
 }
 
@@ -477,6 +490,7 @@ async function startWorkout() {
   selectedDurationSeconds = selectedMinutes() * 60;
   playbackPlan = createPlaybackPlan(selectedDurationSeconds);
   playbackIndex = 0;
+  heardTrackIds = [];
   ensureAudioContext();
   await unlockMusic(playbackPlan[0]);
   setSetupEnabled(false);
@@ -537,7 +551,8 @@ function resultFromMetrics(completed) {
     topSpeedKph: workoutMetrics.topSpeedKph,
     calories: workoutMetrics.calories,
     startingTrackId: playbackPlan[0] ? playbackPlan[0].id : null,
-    startingBpm: playbackPlan[0] ? playbackPlan[0].bpm : null
+    startingBpm: playbackPlan[0] ? playbackPlan[0].bpm : null,
+    tracksHeard: [...heardTrackIds]
   };
 }
 
@@ -553,7 +568,7 @@ function differenceText(metric, amount) {
 function comparisonFor(metric, result, earlier) {
   const value = Number(result[metric.key]) || 0;
   if (!earlier.length) {
-    return `${metric.label}: ${metricValueText(metric, value)}. First recorded result. Personal best set.`;
+    return `${metric.label}: ${metricValueText(metric, value)}. First recorded result for this workout. Personal best for ${result.durationMinutes} minutes.`;
   }
 
   const previous = Number(earlier[earlier.length - 1][metric.key]) || 0;
@@ -573,7 +588,7 @@ function comparisonFor(metric, result, earlier) {
   else clauses.push(`${differenceText(metric, versusAverage)} below your average`);
 
   const pb = value > best + tolerance;
-  return `${metric.label}: ${metricValueText(metric, value)}, ${clauses[0]}, ${clauses[1]}.${pb ? " New personal best." : ""}`;
+  return `${metric.label}: ${metricValueText(metric, value)}, ${clauses[0]}, ${clauses[1]}.${pb ? ` New personal best for ${result.durationMinutes} minutes.` : ""}`;
 }
 
 function renderResults(result, earlier) {
@@ -587,7 +602,7 @@ function renderResults(result, earlier) {
       comparisons.push(text);
       const item = document.createElement("li");
       item.textContent = text;
-      if (text.includes("New personal best") || text.includes("Personal best set")) item.classList.add("pb");
+      if (/personal best/i.test(text)) item.classList.add("pb");
       list.append(item);
     }
   } else {
@@ -610,6 +625,7 @@ async function finishWorkout(completed, statusText) {
   workoutTimer = null;
   $("music").pause();
   $("music-preload").pause();
+  safeSet(LAST_WORKOUT_TRACKS_KEY, JSON.stringify(heardTrackIds));
   $("workout-section").hidden = true;
   if (completed) {
     finishSignal();
@@ -856,7 +872,14 @@ function resetHistory() {
   for (const minutes of [3, 5, 8, 10]) {
     try { localStorage.removeItem(`typhoon-start-bag-${minutes}`); } catch (error) {}
   }
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key && key.startsWith("typhoon-start-bag-v2-")) localStorage.removeItem(key);
+    }
+  } catch (error) {}
   try { localStorage.removeItem(LAST_START_KEY); } catch (error) {}
+  try { localStorage.removeItem(LAST_WORKOUT_TRACKS_KEY); } catch (error) {}
   renderDistanceStats(0);
   speak("All Typhoon workout history has been cleared.");
 }
