@@ -7,7 +7,7 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 - FTMS service `0x1826`, Indoor Bike Data characteristic `0x2ad2`.
 - Workout choices are 3, 5, 8 and 10 minutes.
 - Race-start beeps precede the authoritative workout timer.
-- Starting beeps use the layered square-plus-sine tone. Prime the Web Audio output for one second before the countdown and do not overlap it with a "Get ready" VoiceOver announcement. The finishing signal remains deliberately two-part.
+- Starting beeps use the layered square-plus-sine tone at 500 hertz, with a 1,000-hertz final start signal. Prime the Web Audio output for one second before the countdown, do not overlap it with a "Get ready" VoiceOver announcement, keep the music elements muted while unlocking, and leave one full second between the end of the final signal and unmuting/starting the music. The finishing signal remains deliberately two-part.
 - Music uses only the five MP3 files in `audio/`, preferring the descending order 96, 94, 93, 92, 90 BPM.
 - Starting tracks rotate. Exclude every song actually heard in the immediately preceding workout; cycle within the remaining pool if needed, allowing a larger BPM wrap-around jump rather than violating that exclusion.
 - The workout and music stop automatically at the exact selected duration.

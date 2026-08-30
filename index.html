@@ -494,12 +494,13 @@ async function runCountdown() {
   $("countdown-section").hidden = false;
   for (const number of [3, 2, 1]) {
     $("countdown").textContent = String(number);
-    beep(330, 0.32);
+    beep(500, 0.32);
     await wait(900);
   }
   $("countdown").textContent = "Go";
-  beep(660, 0.65);
-  await wait(700);
+  beep(1000, 0.65);
+  // Leave a full second of silence after the final tone before music begins.
+  await wait(1700);
 }
 
 async function unlockMusic(firstTrack) {
@@ -517,7 +518,12 @@ async function unlockMusic(firstTrack) {
       element.pause();
       element.currentTime = 0;
     } catch (error) {}
-    element.muted = false;
+  }
+}
+
+function unmuteMusic() {
+  for (const element of [activeMusicElement, standbyMusicElement]) {
+    if (element) element.muted = false;
   }
 }
 
@@ -572,6 +578,7 @@ async function startWorkout() {
   await acquireWakeLock();
   await primeAudioOutput();
   await runCountdown();
+  unmuteMusic();
 
   workoutMetrics = freshWorkoutMetrics();
   workoutMetrics.lastMetricTime = performance.now() / 1000;
