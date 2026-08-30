@@ -7,6 +7,7 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 - FTMS service `0x1826`, Indoor Bike Data characteristic `0x2ad2`.
 - Workout choices are 3, 5, 8 and 10 minutes.
 - Race-start beeps precede the authoritative workout timer.
+- Starting beeps must each be a single clean tone; do not layer oscillators. The finishing signal may remain deliberately two-part.
 - Music uses only the five MP3 files in `audio/`, preferring the descending order 96, 94, 93, 92, 90 BPM.
 - Starting tracks rotate. Exclude every song actually heard in the immediately preceding workout; cycle within the remaining pool if needed, allowing a larger BPM wrap-around jump rather than violating that exclusion.
 - The workout and music stop automatically at the exact selected duration.
@@ -19,6 +20,7 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 - Compare performance metrics only with completed sessions of the same duration.
 - Continue recording cadence and speed, but do not display them in results unless Robin asks to restore them.
 - Display average and maximum Watts per kilo after average and top power. Default weight is 75 kilograms; persist the chosen weight and the weight used by each session. Keep Update weight as the final results-screen control.
+- Do not use native `confirm()` or `prompt()` dialogs for results controls; WebBLE may suppress them. Keep reset confirmation and weight editing in-page.
 - Never compare distance or treat it as a personal best. Report distance for this workout, last 7 days, last 30 days and all time.
 - Preserve the local `Songs/` folder, but do not commit it; it contains the large lossless sources.
 

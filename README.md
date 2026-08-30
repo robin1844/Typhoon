@@ -14,7 +14,8 @@ The interface follows Cyclone's minimalist pattern: choose one of four ordinary 
 - At every whole-minute boundary after the start, the remaining time is announced. The final countdown is 30 seconds, 20 seconds, 10 seconds, then 5, 4, 3, 2, 1. These calls appear on screen and take priority over cadence speech.
 - Cadence and speed continue to be recorded in saved sessions, but are intentionally omitted from the current results screen.
 - Results include average and maximum Watts per kilo immediately after the two power results. Weight defaults to 75 kilograms, is saved with each workout, and can be changed only from the final Update weight button on the results screen.
-- The countdown and finish use layered, high-impact race signals.
+- Reset uses an in-page two-tap confirmation and weight uses an in-page editor, avoiding native dialogs that may be suppressed by WebBLE.
+- The countdown uses clean, single-oscillator high-impact race signals; the finish uses a deliberate two-part signal.
 - Two alternating, pre-unlocked audio players preload consecutive tracks to minimise silence at song changes.
 - Distance is not treated as a performance comparison or personal best. Typhoon reports distance for the completed workout, last 7 days, last 30 days and all time.
 - Performance comparisons are made only against completed workouts of the same selected duration.

@@ -129,6 +129,20 @@
   #post-workout-actions { display: grid; gap: .75rem; margin-top: 2rem; }
   #another-workout { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
   #reset-history, #update-weight { color: var(--muted); font-size: .9rem; }
+  #weight-editor { display: grid; gap: .75rem; }
+  #weight-editor label { font-weight: 700; }
+  #weight-kg-input {
+    width: 100%;
+    min-height: 3.5rem;
+    padding: .65rem .8rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--fg);
+    font: inherit;
+    font-size: 1.2rem;
+  }
+  .weight-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
   audio { display: none; }
   [hidden] { display: none !important; }
   .vh {
@@ -195,7 +209,15 @@
 
   <div id="post-workout-actions" hidden>
     <button id="another-workout" type="button">Another workout</button>
-    <button id="reset-history" type="button">Reset workout history</button>
+    <button id="reset-history" type="button">Reset all data</button>
+    <form id="weight-editor" hidden>
+      <label for="weight-kg-input">Weight in kilograms</label>
+      <input id="weight-kg-input" type="number" inputmode="decimal" min="30" max="250" step="0.1" />
+      <div class="weight-actions">
+        <button type="submit">Save weight</button>
+        <button id="cancel-weight" type="button">Cancel</button>
+      </div>
+    </form>
     <button id="update-weight" type="button">Update weight</button>
   </div>
 </div>
@@ -253,6 +275,8 @@ let heardTrackIds = [];
 let activeMusicElement = null;
 let standbyMusicElement = null;
 let currentWorkoutWeightKg = DEFAULT_WEIGHT_KG;
+let resetConfirmationPending = false;
+let resetConfirmationTimer = null;
 let workoutMetrics = freshWorkoutMetrics();
 let chosenMinutes = null;
 
@@ -416,28 +440,20 @@ function ensureAudioContext() {
 
 function beep(frequency, durationSeconds, delaySeconds = 0) {
   ensureAudioContext();
-  const primary = audioContext.createOscillator();
-  const body = audioContext.createOscillator();
-  const bodyGain = audioContext.createGain();
+  const oscillator = audioContext.createOscillator();
   const master = audioContext.createGain();
   const start = audioContext.currentTime + delaySeconds;
   const end = start + durationSeconds;
-  primary.frequency.value = frequency;
-  primary.type = "square";
-  body.frequency.value = frequency / 2;
-  body.type = "sine";
-  bodyGain.gain.value = 0.45;
+  oscillator.frequency.value = frequency;
+  oscillator.type = "square";
   master.gain.setValueAtTime(0.0001, start);
-  master.gain.exponentialRampToValueAtTime(0.46, start + 0.018);
-  master.gain.setValueAtTime(0.46, Math.max(start + 0.02, end - 0.06));
+  master.gain.exponentialRampToValueAtTime(0.58, start + 0.015);
+  master.gain.setValueAtTime(0.58, Math.max(start + 0.02, end - 0.05));
   master.gain.exponentialRampToValueAtTime(0.0001, end);
-  primary.connect(master);
-  body.connect(bodyGain).connect(master);
+  oscillator.connect(master);
   master.connect(audioContext.destination);
-  for (const oscillator of [primary, body]) {
-    oscillator.start(start);
-    oscillator.stop(end + 0.02);
-  }
+  oscillator.start(start);
+  oscillator.stop(end + 0.02);
 }
 
 function finishSignal() {
@@ -944,6 +960,8 @@ function renderDistanceStats(currentWorkoutKm = 0) {
 }
 
 function anotherWorkout() {
+  cancelResetConfirmation();
+  closeWeightEditor(false);
   chosenMinutes = null;
   $("duration-grid").hidden = false;
   $("results-section").hidden = true;
@@ -956,7 +974,15 @@ function anotherWorkout() {
 }
 
 function resetHistory() {
-  if (!confirm("Reset all Typhoon workout results, personal bests and distance totals?")) return;
+  if (!resetConfirmationPending) {
+    resetConfirmationPending = true;
+    $("reset-history").textContent = "Confirm reset all data";
+    speak("Tap again to confirm reset all data.");
+    clearTimeout(resetConfirmationTimer);
+    resetConfirmationTimer = setTimeout(cancelResetConfirmation, 7000);
+    return;
+  }
+  cancelResetConfirmation();
   try { localStorage.removeItem(SESSION_KEY); } catch (error) {}
   for (const minutes of [3, 5, 8, 10]) {
     try { localStorage.removeItem(`typhoon-start-bag-${minutes}`); } catch (error) {}
@@ -973,15 +999,42 @@ function resetHistory() {
   speak("All Typhoon workout history has been cleared.");
 }
 
-function updateWeight() {
-  const response = prompt("Enter your weight in kilograms.", String(loadWeightKg()));
-  if (response === null) return;
-  const weight = Number(response.trim().replace(",", "."));
+function cancelResetConfirmation() {
+  resetConfirmationPending = false;
+  clearTimeout(resetConfirmationTimer);
+  resetConfirmationTimer = null;
+  $("reset-history").textContent = "Reset all data";
+}
+
+function openWeightEditor() {
+  cancelResetConfirmation();
+  const input = $("weight-kg-input");
+  input.value = String(loadWeightKg());
+  input.setCustomValidity("");
+  $("update-weight").hidden = true;
+  $("weight-editor").hidden = false;
+  input.focus();
+}
+
+function closeWeightEditor(restoreFocus = true) {
+  $("weight-editor").hidden = true;
+  $("update-weight").hidden = false;
+  if (restoreFocus) $("update-weight").focus();
+}
+
+function saveWeight(event) {
+  event.preventDefault();
+  const input = $("weight-kg-input");
+  const weight = Number(String(input.value).trim().replace(",", "."));
   if (!Number.isFinite(weight) || weight < 30 || weight > 250) {
-    alert("Enter a weight between 30 and 250 kilograms.");
+    input.setCustomValidity("Enter a weight between 30 and 250 kilograms.");
+    input.reportValidity();
+    input.focus();
     return;
   }
+  input.setCustomValidity("");
   safeSet(WEIGHT_KEY, String(weight));
+  closeWeightEditor();
   speak(`Weight updated to ${weight} kilograms. It will be used for future workouts.`);
 }
 
@@ -991,7 +1044,9 @@ function init() {
   $("end-early").addEventListener("click", () => finishWorkout(false, "Workout ended early. The incomplete result was not saved."));
   $("another-workout").addEventListener("click", anotherWorkout);
   $("reset-history").addEventListener("click", resetHistory);
-  $("update-weight").addEventListener("click", updateWeight);
+  $("update-weight").addEventListener("click", openWeightEditor);
+  $("weight-editor").addEventListener("submit", saveWeight);
+  $("cancel-weight").addEventListener("click", () => closeWeightEditor());
   for (const element of [$("music"), $("music-preload")]) {
     element.addEventListener("ended", onMusicEnded);
     element.addEventListener("error", () => {
