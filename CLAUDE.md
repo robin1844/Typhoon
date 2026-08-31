@@ -16,6 +16,7 @@ Keep the small header Back button visible in every Typhoon state and point it to
 - Only `#music` may ever call `play()` or be unmuted. `#music-preload` is cache-only: keep it paused and muted, never swap it into active playback, to prevent concurrent iOS/AirPods media sessions.
 - Starting tracks rotate. Exclude every song actually heard in the immediately preceding workout; cycle within the remaining pool if needed, allowing a larger BPM wrap-around jump rather than violating that exclusion.
 - The in-workout Next song button advances through that same eligible pool, wrapping from the lowest to the highest BPM when necessary.
+- Register the Media Session `nexttrack` action to invoke the same guarded music-advance function, enabling AirPods and system media controls without introducing another audio player.
 - The workout and music stop automatically at the exact selected duration.
 - Cadence announcements use the number only and occur only during the workout.
 - Announce every whole-minute boundary after the start, plus 30, 20, 10, 5, 4, 3, 2 and 1 seconds. Time calls are visible and always take precedence over cadence speech.

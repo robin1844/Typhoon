@@ -22,6 +22,7 @@ The interface follows Cyclone's minimalist pattern: choose one of four ordinary 
 - The countdown uses smooth sine-wave 500-hertz signals and a 1,000-hertz start signal, matching the documented Swiss Timing track-cycling pitches. The audio engine is opened when a duration is selected so Start has no artificial warm-up delay, and a full second of silence separates the start signal from the music.
 - A single unlocked audio player is the only element allowed to play music. A permanently muted, never-played second element may preload the next file into the browser cache, preventing duplicate iOS/AirPods media sessions while minimising silence at song changes.
 - A Next song button is available during a workout. It follows the descending playlist order and wraps to the top when necessary, while continuing to exclude songs heard in the preceding workout.
+- On supported devices and browsers, the media-session next-track command, including the usual AirPods double-squeeze, invokes that same Next song action.
 - Distance is not treated as a performance comparison or personal best. Typhoon reports distance for the completed workout, last 7 days, last 30 days and all time.
 - Performance comparisons are made only against completed workouts of the same selected duration.
 
