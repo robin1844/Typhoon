@@ -111,7 +111,10 @@
   #cadence-display { text-align: center; margin: 2rem 0; }
   #cadence-label { color: var(--muted); font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
   #live-cadence-value { color: var(--accent); font-size: 6rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-  #end-early { width: 100%; color: var(--danger); margin-top: 2rem; }
+  .workout-actions { display: grid; gap: 1rem; margin-top: 2rem; }
+  .workout-actions button { width: 100%; }
+  #next-song { color: var(--accent); }
+  #end-early { color: var(--danger); }
   .comparison-list { list-style: none; margin: 0; padding: 0; }
   .comparison-list li, .stat-row {
     padding: .8rem 1rem;
@@ -191,7 +194,10 @@
       <div id="cadence-label">Cadence (RPM)</div>
       <div id="live-cadence-value">0</div>
     </div>
-    <button id="end-early" type="button">End workout early</button>
+    <div class="workout-actions">
+      <button id="next-song" type="button">Next song</button>
+      <button id="end-early" type="button">End workout early</button>
+    </div>
   </section>
 
   <section id="results-section" hidden>
@@ -274,6 +280,7 @@ let playbackIndex = 0;
 let heardTrackIds = [];
 let activeMusicElement = null;
 let standbyMusicElement = null;
+let musicAdvancePending = false;
 let currentWorkoutWeightKg = DEFAULT_WEIGHT_KG;
 let resetConfirmationPending = false;
 let resetConfirmationTimer = null;
@@ -345,6 +352,8 @@ function updateMainAction() {
 }
 
 function chooseDuration(event) {
+  // Warm the audio route on this early user gesture so Start is immediate.
+  warmAudioOutput();
   chosenMinutes = Number(event.currentTarget.dataset.minutes);
   $("duration-grid").hidden = true;
   updateMainAction();
@@ -438,37 +447,8 @@ function ensureAudioContext() {
   if (audioContext.state === "suspended") audioContext.resume();
 }
 
-function beep(frequency, durationSeconds, delaySeconds = 0) {
+function warmAudioOutput() {
   ensureAudioContext();
-  const primary = audioContext.createOscillator();
-  const body = audioContext.createOscillator();
-  const bodyGain = audioContext.createGain();
-  const master = audioContext.createGain();
-  const start = audioContext.currentTime + delaySeconds;
-  const end = start + durationSeconds;
-  primary.frequency.value = frequency;
-  primary.type = "square";
-  body.frequency.value = frequency / 2;
-  body.type = "sine";
-  bodyGain.gain.value = 0.45;
-  master.gain.setValueAtTime(0.0001, start);
-  master.gain.exponentialRampToValueAtTime(0.46, start + 0.018);
-  master.gain.setValueAtTime(0.46, Math.max(start + 0.02, end - 0.06));
-  master.gain.exponentialRampToValueAtTime(0.0001, end);
-  primary.connect(master);
-  body.connect(bodyGain).connect(master);
-  master.connect(audioContext.destination);
-  for (const oscillator of [primary, body]) {
-    oscillator.start(start);
-    oscillator.stop(end + 0.02);
-  }
-}
-
-async function primeAudioOutput() {
-  ensureAudioContext();
-  if (audioContext.state === "suspended") {
-    try { await audioContext.resume(); } catch (error) {}
-  }
   const oscillator = audioContext.createOscillator();
   const gain = audioContext.createGain();
   const now = audioContext.currentTime;
@@ -478,7 +458,24 @@ async function primeAudioOutput() {
   oscillator.connect(gain).connect(audioContext.destination);
   oscillator.start(now);
   oscillator.stop(now + 0.7);
-  await wait(1000);
+}
+
+function beep(frequency, durationSeconds, delaySeconds = 0) {
+  ensureAudioContext();
+  const oscillator = audioContext.createOscillator();
+  const master = audioContext.createGain();
+  const start = audioContext.currentTime + delaySeconds;
+  const end = start + durationSeconds;
+  oscillator.frequency.value = frequency;
+  oscillator.type = "sine";
+  master.gain.setValueAtTime(0.0001, start);
+  master.gain.exponentialRampToValueAtTime(0.68, start + 0.03);
+  master.gain.setValueAtTime(0.68, Math.max(start + 0.04, end - 0.08));
+  master.gain.exponentialRampToValueAtTime(0.0001, end);
+  oscillator.connect(master);
+  master.connect(audioContext.destination);
+  oscillator.start(start);
+  oscillator.stop(end + 0.02);
 }
 
 function finishSignal() {
@@ -556,13 +553,36 @@ async function playCurrentTrack() {
   catch (error) { speak("Music could not start. The workout timer is still running."); }
 }
 
+function nextEligibleTrackAfter(trackId) {
+  const previousTrackIds = new Set(loadLastWorkoutTrackIds());
+  let candidates = TRACKS.filter(track => !previousTrackIds.has(track.id));
+  if (!candidates.length) candidates = TRACKS;
+  const currentPosition = candidates.findIndex(track => track.id === trackId);
+  return candidates[(currentPosition + 1 + candidates.length) % candidates.length];
+}
+
+async function advanceMusic() {
+  if (!workoutActive || !activeMusicElement || musicAdvancePending) return;
+  musicAdvancePending = true;
+  $("next-song").disabled = true;
+  try {
+    activeMusicElement.pause();
+    if (playbackIndex + 1 >= playbackPlan.length) {
+      const next = nextEligibleTrackAfter(playbackPlan[playbackIndex].id);
+      playbackPlan.push({ ...next, playFor: next.seconds });
+    }
+    playbackIndex++;
+    [activeMusicElement, standbyMusicElement] = [standbyMusicElement, activeMusicElement];
+    await playCurrentTrack();
+  } finally {
+    musicAdvancePending = false;
+    $("next-song").disabled = false;
+  }
+}
+
 function onMusicEnded(event) {
   if (!workoutActive || event.currentTarget !== activeMusicElement) return;
-  playbackIndex++;
-  if (playbackIndex < playbackPlan.length) {
-    [activeMusicElement, standbyMusicElement] = [standbyMusicElement, activeMusicElement];
-    playCurrentTrack();
-  }
+  advanceMusic();
 }
 
 async function startWorkout() {
@@ -576,7 +596,6 @@ async function startWorkout() {
   await unlockMusic(playbackPlan[0]);
   setSetupEnabled(false);
   await acquireWakeLock();
-  await primeAudioOutput();
   await runCountdown();
   unmuteMusic();
 
@@ -1073,6 +1092,7 @@ function saveWeight(event) {
 function init() {
   for (const button of document.querySelectorAll(".duration-choice")) button.addEventListener("click", chooseDuration);
   $("main-action").addEventListener("click", () => connected ? startWorkout() : connect());
+  $("next-song").addEventListener("click", advanceMusic);
   $("end-early").addEventListener("click", () => finishWorkout(false, "Workout ended early. The incomplete result was not saved."));
   $("another-workout").addEventListener("click", anotherWorkout);
   $("reset-history").addEventListener("click", resetHistory);

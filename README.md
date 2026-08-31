@@ -15,8 +15,9 @@ The interface follows Cyclone's minimalist pattern: choose one of four ordinary 
 - Cadence and speed continue to be recorded in saved sessions, but are intentionally omitted from the current results screen.
 - Results include average and maximum Watts per kilo immediately after the two power results. Weight defaults to 75 kilograms, is saved with each workout, and can be changed only from the final Update weight button on the results screen.
 - Reset uses an in-page two-tap confirmation and weight uses an in-page editor, avoiding native dialogs that may be suppressed by WebBLE.
-- The countdown uses layered 500-hertz signals and a 1,000-hertz start signal, matching the documented Swiss Timing track-cycling pitches. A brief near-silent audio warm-up stabilises the first-use iOS/AirPods audio route, and a full second of silence separates the start signal from the music.
+- The countdown uses smooth sine-wave 500-hertz signals and a 1,000-hertz start signal, matching the documented Swiss Timing track-cycling pitches. The audio engine is opened when a duration is selected so Start has no artificial warm-up delay, and a full second of silence separates the start signal from the music.
 - Two alternating, pre-unlocked audio players preload consecutive tracks to minimise silence at song changes.
+- A Next song button is available during a workout. It follows the descending playlist order and wraps to the top when necessary, while continuing to exclude songs heard in the preceding workout.
 - Distance is not treated as a performance comparison or personal best. Typhoon reports distance for the completed workout, last 7 days, last 30 days and all time.
 - Performance comparisons are made only against completed workouts of the same selected duration.
 
