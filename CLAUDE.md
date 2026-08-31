@@ -13,6 +13,7 @@ Keep the small header Back button visible in every Typhoon state and point it to
 - Race-start beeps precede the authoritative workout timer.
 - Starting and finishing beeps use a smooth single-sine tone. The starting countdown uses 500 hertz with a 1,000-hertz final start signal. Open the Web Audio engine when the duration is selected so Start has no artificial warm-up delay; do not overlap the countdown with a "Get ready" VoiceOver announcement. Keep music muted while unlocking and leave one full second between the final signal and starting music. The finishing signal remains deliberately two-part.
 - Music uses only the five MP3 files in `audio/`, preferring the descending order 96, 94, 93, 92, 90 BPM.
+- Only `#music` may ever call `play()` or be unmuted. `#music-preload` is cache-only: keep it paused and muted, never swap it into active playback, to prevent concurrent iOS/AirPods media sessions.
 - Starting tracks rotate. Exclude every song actually heard in the immediately preceding workout; cycle within the remaining pool if needed, allowing a larger BPM wrap-around jump rather than violating that exclusion.
 - The in-workout Next song button advances through that same eligible pool, wrapping from the lowest to the highest BPM when necessary.
 - The workout and music stop automatically at the exact selected duration.
