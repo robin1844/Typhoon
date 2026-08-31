@@ -4,6 +4,8 @@ Typhoon is Robin's private short spin-session app, derived conceptually from Acc
 
 Distance totals use the origin-wide `cyclone-typhoon-distances-v1` ledger shared with Cyclone. Keep performance/PB sessions in `typhoon-sessions-v1`; only distance is shared.
 
+Keep the small header Back button visible in every Typhoon state and point it to the combined launcher at `/Cyclone/`.
+
 ## Non-negotiable behaviour
 
 - FTMS service `0x1826`, Indoor Bike Data characteristic `0x2ad2`.

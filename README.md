@@ -4,6 +4,8 @@ Typhoon is a compact, accessible Web Bluetooth spin-workout app for 3, 5, 8 and 
 
 When served from Robin's GitHub Pages account, Typhoon shares only its distance ledger with Cyclone. Existing Cyclone and Typhoon distances are imported automatically; Typhoon's performance history remains separate.
 
+The persistent header **Back** button returns to the combined Cyclone/Typhoon launcher at `/Cyclone/`, including during countdown, workout and results screens.
+
 The interface follows Cyclone's minimalist pattern: choose one of four ordinary large duration buttons, which are then replaced by the single large Connect button. That same button becomes Start after connection. Results are followed by distance totals at the finish.
 
 ## Workout behaviour
