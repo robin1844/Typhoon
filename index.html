@@ -234,6 +234,8 @@
 const FTMS = 0x1826;
 const INDOOR_BIKE_DATA = 0x2ad2;
 const SESSION_KEY = "typhoon-sessions-v1";
+const DISTANCE_KEY = "cyclone-typhoon-distances-v1";
+const DISTANCE_MIGRATION_KEY = "cyclone-typhoon-distances-migrated-v1";
 const DEVICE_KEY = "typhoon-device-name";
 const LAST_START_KEY = "typhoon-last-start-track";
 const LAST_WORKOUT_TRACKS_KEY = "typhoon-last-workout-tracks";
@@ -320,6 +322,56 @@ function loadSessions() {
   } catch (error) { return []; }
 }
 function saveSessions(sessions) { safeSet(SESSION_KEY, JSON.stringify(sessions)); }
+
+function parseStoredArray(key) {
+  try {
+    const value = JSON.parse(safeGet(key, "[]"));
+    return Array.isArray(value) ? value : [];
+  } catch (error) { return []; }
+}
+
+function migrateDistanceHistory() {
+  if (safeGet(DISTANCE_MIGRATION_KEY, "") === "1") return;
+  const ledger = [];
+  for (const [index, session] of parseStoredArray("cyclone-sessions").entries()) {
+    const km = Number(session.km);
+    if (km > 0 && /^\d{4}-\d{2}-\d{2}$/.test(session.date || "")) {
+      ledger.push({ id: `cyclone-legacy-${index}`, source: "cyclone", endedAt: `${session.date}T12:00:00.000Z`, km });
+    }
+  }
+  for (const [index, session] of loadSessions().entries()) {
+    const km = Number(session.distanceKm);
+    const endedAt = session.endedAt || "";
+    if (session.completed && km > 0 && Number.isFinite(Date.parse(endedAt))) {
+      ledger.push({ id: `typhoon-${session.id || index}`, source: "typhoon", endedAt, km });
+    }
+  }
+  safeSet(DISTANCE_KEY, JSON.stringify(ledger));
+  safeSet(DISTANCE_MIGRATION_KEY, "1");
+}
+
+function loadDistanceLedger() {
+  migrateDistanceHistory();
+  return parseStoredArray(DISTANCE_KEY);
+}
+
+function saveDistanceLedger(ledger) { safeSet(DISTANCE_KEY, JSON.stringify(ledger)); }
+
+function recordCombinedDistance(result) {
+  const km = Number(result.distanceKm);
+  if (!(km > 0)) return;
+  const id = `typhoon-${result.id}`;
+  const ledger = loadDistanceLedger();
+  if (ledger.some(entry => entry.id === id)) return;
+  ledger.push({ id, source: "typhoon", endedAt: result.endedAt, km });
+  saveDistanceLedger(ledger);
+}
+
+function resetCombinedDistances() {
+  saveDistanceLedger([]);
+  safeSet(DISTANCE_MIGRATION_KEY, "1");
+  try { localStorage.removeItem("cyclone-sessions"); } catch (error) {}
+}
 
 function speak(text) {
   if (!text) return;
@@ -761,7 +813,7 @@ function renderResults(result, earlier) {
     list.append(item);
   }
 
-  const stats = computeDistanceStats(loadSessions());
+  const stats = computeDistanceStats();
   const distanceSpeech = `Distance travelled: ${kilometresText(result.distanceKm)}. Last 7 days: ${kilometresText(stats.weekKm)}. Last 30 days: ${kilometresText(stats.monthKm)}. All time: ${kilometresText(stats.allKm)}.`;
   const intro = result.completed ? `${result.durationMinutes} minute workout completed.` : "Workout ended early.";
   speak([intro, ...comparisons, distanceSpeech].join(" "));
@@ -789,6 +841,7 @@ async function finishWorkout(completed, statusText) {
   if (completed) {
     sessions.push(result);
     saveSessions(sessions);
+    recordCombinedDistance(result);
   }
   renderDistanceStats(result.distanceKm);
   renderResults(result, earlier);
@@ -984,7 +1037,8 @@ async function scanAll() {
   } catch (error) { reportConnectionError(error); }
 }
 
-function computeDistanceStats(sessions) {
+function computeDistanceStats() {
+  const sessions = loadDistanceLedger();
   const now = Date.now();
   const weekStart = now - 7 * 24 * 60 * 60 * 1000;
   const monthStart = now - 30 * 24 * 60 * 60 * 1000;
@@ -992,8 +1046,7 @@ function computeDistanceStats(sessions) {
   let monthKm = 0;
   let allKm = 0;
   for (const session of sessions) {
-    if (!session.completed) continue;
-    const km = Number(session.distanceKm) || 0;
+    const km = Number(session.km) || 0;
     const time = Date.parse(session.endedAt);
     allKm += km;
     if (Number.isFinite(time) && time >= weekStart) weekKm += km;
@@ -1003,7 +1056,7 @@ function computeDistanceStats(sessions) {
 }
 
 function renderDistanceStats(currentWorkoutKm = 0) {
-  const stats = computeDistanceStats(loadSessions());
+  const stats = computeDistanceStats();
   $("distance-workout").textContent = kilometresText(currentWorkoutKm);
   $("distance-week").textContent = kilometresText(stats.weekKm);
   $("distance-month").textContent = kilometresText(stats.monthKm);
@@ -1046,8 +1099,9 @@ function resetHistory() {
   } catch (error) {}
   try { localStorage.removeItem(LAST_START_KEY); } catch (error) {}
   try { localStorage.removeItem(LAST_WORKOUT_TRACKS_KEY); } catch (error) {}
+  resetCombinedDistances();
   renderDistanceStats(0);
-  speak("All Typhoon workout history has been cleared.");
+  speak("All Typhoon workout history and combined distance data have been cleared.");
 }
 
 function cancelResetConfirmation() {

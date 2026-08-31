@@ -2,6 +2,8 @@
 
 Typhoon is Robin's private short spin-session app, derived conceptually from Access Gym and Cyclone. Keep it as a dependency-free static web app suitable for GitHub Pages and the WebBLE iPhone browser.
 
+Distance totals use the origin-wide `cyclone-typhoon-distances-v1` ledger shared with Cyclone. Keep performance/PB sessions in `typhoon-sessions-v1`; only distance is shared.
+
 ## Non-negotiable behaviour
 
 - FTMS service `0x1826`, Indoor Bike Data characteristic `0x2ad2`.
