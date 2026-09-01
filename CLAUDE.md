@@ -12,7 +12,7 @@ Keep the small header Back button visible in every Typhoon state and point it to
 - Workout choices are 3, 5, 8 and 10 minutes.
 - Race-start beeps precede the authoritative workout timer.
 - Starting and finishing beeps use a smooth single-sine tone. The starting countdown uses 500 hertz with a 1,000-hertz final start signal. Open the Web Audio engine when the duration is selected so Start has no artificial warm-up delay; do not overlap the countdown with a "Get ready" VoiceOver announcement. Keep music muted while unlocking and leave one full second between the final signal and starting music. The finishing signal remains deliberately two-part.
-- Music uses only the eight MP3 files in `audio/`, preferring the descending order 97, 96, 95, 94, 93, 92, 90, 90 BPM.
+- Music uses only the twelve MP3 files in `audio/`, preferring descending BPM order from 98 to 90.
 - Only `#music` may ever call `play()` or be unmuted. `#music-preload` is cache-only: keep it paused and muted, never swap it into active playback, to prevent concurrent iOS/AirPods media sessions.
 - Starting tracks rotate. The automatic workout plan excludes every song actually heard in the immediately preceding workout and cycles within the remaining pool if needed.
 - The in-workout Next song button first advances through the remaining planned tracks, skipping repeats already heard in the current workout, then draws from every other unplayed track in the full library before wrapping. An explicit user skip may therefore override the preceding-workout exclusion after the initial plan is exhausted.
