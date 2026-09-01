@@ -35,7 +35,7 @@ On iPhone, open the live HTTPS page in a Web Bluetooth browser such as WebBLE. P
 ## Project structure
 
 - `index.html` — the complete application, with inline CSS and JavaScript.
-- `audio/` — the twelve selected tracks encoded as compact, high-quality MP3 files.
+- `audio/` — the ten selected tracks encoded as compact, high-quality MP3 files.
 - `manifest.webmanifest` — installable web-app metadata.
 - `Songs/` — local lossless source audio and working splits; intentionally excluded from Git.
 - `CLAUDE.md` — implementation and maintenance notes.
