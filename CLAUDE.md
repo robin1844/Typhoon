@@ -12,7 +12,7 @@ Keep the small header Back button visible in every Typhoon state and point it to
 - Workout choices are 3, 5, 8 and 10 minutes.
 - Race-start beeps precede the authoritative workout timer.
 - Starting and finishing beeps use a smooth single-sine tone. The starting countdown uses 500 hertz with a 1,000-hertz final start signal. Open the Web Audio engine when the duration is selected so Start has no artificial warm-up delay; do not overlap the countdown with a "Get ready" VoiceOver announcement. Keep music muted while unlocking and leave one full second between the final signal and starting music. The finishing signal remains deliberately two-part.
-- Music uses only the five MP3 files in `audio/`, preferring the descending order 96, 94, 93, 92, 90 BPM.
+- Music uses only the eight MP3 files in `audio/`, preferring the descending order 97, 96, 95, 94, 93, 92, 90, 90 BPM.
 - Only `#music` may ever call `play()` or be unmuted. `#music-preload` is cache-only: keep it paused and muted, never swap it into active playback, to prevent concurrent iOS/AirPods media sessions.
 - Starting tracks rotate. The automatic workout plan excludes every song actually heard in the immediately preceding workout and cycles within the remaining pool if needed.
 - The in-workout Next song button first advances through the remaining planned tracks, skipping repeats already heard in the current workout, then draws from every other unplayed track in the full library before wrapping. An explicit user skip may therefore override the preceding-workout exclusion after the initial plan is exhausted.
@@ -20,7 +20,7 @@ Keep the small header Back button visible in every Typhoon state and point it to
 - The workout and music stop automatically at the exact selected duration.
 - Cadence announcements use the number only and occur only during the workout.
 - Announce every whole-minute boundary after the start, plus 30, 20, 10, 5, 4, 3, 2 and 1 seconds. Time calls are visible and always take precedence over cadence speech.
-- Use the two alternating audio elements to preload and hand off between songs with minimal silence.
+- Keep the muted `#music-preload` element cache-only so transitions are prepared without creating a second audible player.
 - Keep exactly one hidden ARIA live element for spoken output; do not add named regions, status regions or page landmarks.
 - Spoken units: spell out Watts and kilometres; RPM and KPH are acceptable.
 - Spoken comparisons use commas rather than em dashes and do not repeat the workout duration.
